@@ -22,24 +22,33 @@ def preprocess_midi(path):
 #     return event_seq.to_array(), control_seq.to_compressed_array()
 
 
-def preprocess_midi_files_under(midi_root, save_dir):
+def preprocess_midi_files_under(midi_root, save_dir, use_sustain=True):
     midi_paths = list(utils.find_files_by_extensions(midi_root, ['.mid', '.midi']))
     os.makedirs(save_dir, exist_ok=True)
-    out_fmt = '{}-{}.data'
 
     for path in Bar('Processing').iter(midi_paths):
-        print(' ', end='[{}]'.format(path), flush=True)
+        print(path)
+
+        out_file = '{}/{}.pickle'.format(save_dir,path.split('/')[-1])
+        if os.path.exists(out_file):
+            continue
 
         try:
-            data = preprocess_midi(path)
+            data = encode_midi(path, use_sustain)
+        except OSError:
+            print("OSError")
+        except ValueError:
+            print("ValueError")
+        except KeyError:
+            print("KeyError")
         except KeyboardInterrupt:
             print(' Abort')
             return
         except EOFError:
             print('EOF Error')
-
-        with open('{}/{}.pickle'.format(save_dir,path.split('/')[-1]), 'wb') as f:
-            pickle.dump(data, f)
+        else:
+            with open(out_file, 'wb') as f:
+                pickle.dump(data, f)
 
 
 # def _augumentation(seq):
