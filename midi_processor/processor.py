@@ -199,6 +199,26 @@ def _note_preprocess(susteins, notes):
     return note_stream
 
 
+def encode_melody(mid):
+    """
+    Takes a pretty midi object and splits up notes into note on and
+    note off events, as well as add time shift events for pauses.
+    """
+    events = []
+    notes = []    
+    for inst in mid.instruments:
+        notes += _divide_note(inst.notes)
+    notes.sort(key=lambda x: x.time)
+    cur_time = 0
+    cur_vel = 0
+    for snote in notes:
+        events += _make_time_sift_events(prev_time=cur_time, post_time=snote.time)
+        events += _snote2events(snote=snote, prev_vel=cur_vel)
+        cur_time = snote.time
+        cur_vel = snote.velocity
+    return [e.to_int() for e in events]
+
+
 def encode_midi(file_path, use_sustain=True):
     events = []
     notes = []

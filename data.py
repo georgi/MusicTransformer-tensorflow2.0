@@ -7,7 +7,9 @@ import params as par
 
 
 class Data:
-    def __init__(self, dir_path):
+    def __init__(self, dir_path, token_eos=par.token_eos, pad_token=par.pad_token):
+        self.token_eos = token_eos
+        self.pad_token = pad_token
         self.files = list(utils.find_files_by_extensions(dir_path, ['.pickle']))
         self.file_dict = {
             'train': self.files[:int(len(self.files) * 0.8)],
@@ -84,9 +86,9 @@ class Data:
                 start = random.randrange(0,len(data) - max_length)
                 data = data[start:start + max_length]
             else:
-                data = np.append(data, par.token_eos)
+                data = np.append(data, self.token_eos)
                 while len(data) < max_length:
-                    data = np.append(data, par.pad_token)
+                    data = np.append(data, self.pad_token)
         return data
 
 
@@ -111,7 +113,7 @@ def add_noise(inputs: np.array, rate:float = 0.01): # input's dim is 2
     num_mask = int(rate * seq_length)
     for inp in inputs:
         rand_idx = random.sample(range(seq_length), num_mask)
-        inp[rand_idx] = random.randrange(0, par.pad_token)
+        inp[rand_idx] = random.randrange(0, self.pad_token)
 
     return inputs
 
