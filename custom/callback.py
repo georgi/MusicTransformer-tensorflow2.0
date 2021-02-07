@@ -35,12 +35,12 @@ class TransformerLoss(keras.losses.SparseCategoricalCrossentropy):
         return _loss
 
 
-def transformer_dist_train_loss(y_true, y_pred):
+def transformer_dist_train_loss(y_true, y_pred, vocab_size=par.vocab_size):
     y_true = tf.cast(y_true, tf.int32)
     mask = tf.math.logical_not(tf.math.equal(y_true, par.pad_token))
     mask = tf.cast(mask, tf.float32)
 
-    y_true_vector = tf.one_hot(y_true, par.vocab_size)
+    y_true_vector = tf.one_hot(y_true, vocab_size)
 
     _loss = tf.nn.softmax_cross_entropy_with_logits(y_true_vector, y_pred)
     # print(_loss.shape)
