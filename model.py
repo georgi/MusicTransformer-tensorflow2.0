@@ -162,7 +162,7 @@ class MusicTransformerDecoder(keras.Model):
         config['dist'] = self.dist
         return config
     
-    def generate_beam(self, prior: list, length=2048, k=8):
+    def generate_beam(self, prior: list, length=2048, k=8, temperature=0.5):
         decode_array = prior
         decode_array = tf.constant([decode_array])
         seq_probs = [1.0]
@@ -175,7 +175,7 @@ class MusicTransformerDecoder(keras.Model):
                 utils.get_masked_with_pad_tensor(decode_array.shape[1], decode_array, decode_array, self.pad_token)
 
             result = self.call(decode_array, lookup_mask=look_ahead_mask, training=False, eval=False)
-            result = result[:,-1,:]
+            result = result[:,-1,:] / (temperature + 1e-6)
             probs, result_idx = tf.nn.top_k(result, k)
 
             result_array = []
@@ -205,7 +205,7 @@ class MusicTransformerDecoder(keras.Model):
                 break
             print('generating... {:.1f}% completed'.format((i/min(self.max_seq, length))*100), end="\r")
             _, _, look_ahead_mask = \
-                utils.get_masked_with_pad_tensor(decode_array.shape[1], decode_array, decode_array)
+                utils.get_masked_with_pad_tensor(decode_array.shape[1], decode_array, decode_array, self.pad_token)
 
             result, _ = self.call(decode_array, lookup_mask=look_ahead_mask, training=False, eval=True)
             result = result[:, -1] / (temperature + 1e-6)
