@@ -11,106 +11,65 @@ import sys
 
 tf.executing_eagerly()
 
-parser = argparse.ArgumentParser()
+from concurrent.futures import ThreadPoolExecutor
 
-parser.add_argument('--l_r', default=None, help='학습률', type=float)
-parser.add_argument('--batch_size', default=2, help='batch size', type=int)
-parser.add_argument('--pickle_dir', default='music', help='데이터셋 경로')
-parser.add_argument('--max_seq', default=2048, help='최대 길이', type=int)
-parser.add_argument('--epochs', default=100, help='에폭 수', type=int)
-parser.add_argument('--load_path', default=None, help='모델 로드 경로', type=str)
-parser.add_argument('--save_path', default="result/dec0722", help='모델 저장 경로')
-parser.add_argument('--is_reuse', default=False)
-parser.add_argument('--multi_gpu', default=True)
-parser.add_argument('--num_layers', default=6, type=int)
+def run_training(epochs, dataset, batch_size, max_seq):
+    batches_per_epoch = len(dataset) // batch_size
+    num_eval_batches = 20
 
-args = parser.parse_args()
+    def get_train_batch():
+        return dataset.slide_seq2seq_batch(batch_size, max_seq, 'train')
 
 
-# set arguments
-l_r = args.l_r
-batch_size = args.batch_size
-pickle_dir = args.pickle_dir
-max_seq = args.max_seq
-epochs = args.epochs
-is_reuse = args.is_reuse
-load_path = args.load_path
-save_path = args.save_path
-multi_gpu = args.multi_gpu
-num_layer = args.num_layers
+    def get_eval_batch():
+        return dataset.slide_seq2seq_batch(batch_size, max_seq, 'eval')
 
 
-# load data
-dataset = Data(pickle_dir)
-print(dataset)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        for e in range(epochs):
+            mt.reset_metrics()
+            train_acc = []
+            train_loss = []      
+            valid_acc = []
+            valid_loss = []
 
+            futures = [
+                executor.submit(get_train_batch)
+                for b in range(batches_per_epoch)
+            ]
 
-# load model
-learning_rate = callback.CustomSchedule(par.embedding_dim) if l_r is None else l_r
-opt = Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
+            for future in futures:
+                batch_x, batch_y = future.result()
+                result_metrics = mt.train_on_batch(batch_x, batch_y)
+                train_loss.append(result_metrics[0])
+                train_acc.append(result_metrics[1])
+                log_line = 'Train Loss: {:.3f}\tTrain Acc: {:.3f}'.format( 
+                    np.mean(train_loss),
+                    np.mean(train_acc),
+                )
+                print(log_line, end="\r")
 
+            futures = [
+                executor.submit(get_eval_batch)
+                for b in range(num_eval_batches)
+            ]
 
-# define model
-mt = MusicTransformerDecoder(
-            embedding_dim=256,
-            vocab_size=par.vocab_size,
-            num_layer=num_layer,
-            max_seq=max_seq,
-            dropout=0.2,
-            debug=False, loader_path=load_path)
-mt.compile(optimizer=opt, loss=callback.transformer_dist_train_loss)
+            for future in futures:
+                eval_x, eval_y = future.result()
+                eval_result_metrics, weights = mt.evaluate(eval_x, eval_y)
+                valid_loss.append(eval_result_metrics[0])
+                valid_acc.append(eval_result_metrics[1])
 
+            mt.save(model_path)
 
-# define tensorboard writer
-current_time = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-train_log_dir = 'logs/mt_decoder/'+current_time+'/train'
-eval_log_dir = 'logs/mt_decoder/'+current_time+'/eval'
-train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-eval_summary_writer = tf.summary.create_file_writer(eval_log_dir)
-
-
-# Train Start
-idx = 0
-for e in range(epochs):
-    mt.reset_metrics()
-    for b in range(len(dataset.files) // batch_size):
-        try:
-            batch_x, batch_y = dataset.slide_seq2seq_batch(batch_size, max_seq)
-        except:
-            continue
-        result_metrics = mt.train_on_batch(batch_x, batch_y)
-        if b % 100 == 0:
-            eval_x, eval_y = dataset.slide_seq2seq_batch(batch_size, max_seq, 'eval')
-            eval_result_metrics, weights = mt.evaluate(eval_x, eval_y)
-            mt.save(save_path)
-            with train_summary_writer.as_default():
-                if b == 0:
-                    tf.summary.histogram("target_analysis", batch_y, step=e)
-                    tf.summary.histogram("source_analysis", batch_x, step=e)
-
-                tf.summary.scalar('loss', result_metrics[0], step=idx)
-                tf.summary.scalar('accuracy', result_metrics[1], step=idx)
-
-            with eval_summary_writer.as_default():
-                if b == 0:
-                    mt.sanity_check(eval_x, eval_y, step=e)
-
-                tf.summary.scalar('loss', eval_result_metrics[0], step=idx)
-                tf.summary.scalar('accuracy', eval_result_metrics[1], step=idx)
-                for i, weight in enumerate(weights):
-                    with tf.name_scope("layer_%d" % i):
-                        with tf.name_scope("w"):
-                            utils.attention_image_summary(weight, step=idx)
-                # for i, weight in enumerate(weights):
-                #     with tf.name_scope("layer_%d" % i):
-                #         with tf.name_scope("_w0"):
-                #             utils.attention_image_summary(weight[0])
-                #         with tf.name_scope("_w1"):
-                #             utils.attention_image_summary(weight[1])
-            idx += 1
-            print('\n====================================================')
-            print('Epoch/Batch: {}/{}'.format(e, b))
-            print('Train >>>> Loss: {:6.6}, Accuracy: {}'.format(result_metrics[0], result_metrics[1]))
-            print('Eval >>>> Loss: {:6.6}, Accuracy: {}'.format(eval_result_metrics[0], eval_result_metrics[1]))
-
+            log_line = 'Epoch {}\tTrain Loss: {:.3f}\tTrain Acc: {:.3f}\tValid Loss: {:.3f}\tValid Acc: {:.3f}'.format(
+                e,
+                np.mean(train_loss),
+                np.mean(train_acc), 
+                np.mean(valid_loss),
+                np.mean(valid_acc),
+            )
+            print(log_line)
+            with open(os.path.join(model_path, 'metrics.log'), 'a') as f:
+                print(log_line, file=f)
 
