@@ -16,6 +16,16 @@ def train_test_split(dataset, split=0.90):
     return train, dataset_copy
 
 
+def load_seq_files(files):
+    res = []
+    for fname in files:
+        with open(fname, 'rb') as f:
+            ns = note_seq.NoteSequence()
+            ns.ParseFromString(f.read())
+            res.append(ns)
+    return res
+
+
 class Data:
     def __init__(self, sequences, token_eos, pad_token):
         self.token_eos = token_eos
