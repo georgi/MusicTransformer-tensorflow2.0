@@ -2,7 +2,11 @@ import random
 import numpy as np
 from random import randrange, gauss
 import note_seq
-from note_seq.sequences_lib import stretch_note_sequence, transpose_note_sequence
+from note_seq.sequences_lib import (
+    stretch_note_sequence, 
+    transpose_note_sequence,
+    NegativeTimeError
+)
         
 def train_test_split(dataset, split=0.90):
     train = list()
@@ -61,20 +65,18 @@ class Data:
         if mode == 'train':
             try:
                 data = self.midi_encoder.encode_note_sequence(self.augment(ns))
-            except BaseException as e:
-                print(e)
+            except NegativeTimeError:
                 data = self.midi_encoder.encode_note_sequence(ns)
         else:
             data = self.midi_encoder.encode_note_sequence(ns)
             
-        if max_length < len(data):
+        if len(data) > max_length:
             start = random.randrange(0, len(data) - max_length)
             data = data[start:start + max_length]
-        else:
+        elif len(data) < max_length:
             data = np.append(data, self.token_eos)
-
-        while len(data) < max_length:
-            data = np.append(data, self.pad_token)
+            while len(data) < max_length:
+                data = np.append(data, self.pad_token)
 
         assert(len(data) == max_length)
 

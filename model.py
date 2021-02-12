@@ -24,7 +24,8 @@ class MusicTransformerDecoder(keras.Model):
             self.embedding_dim = embedding_dim
             self.vocab_size = vocab_size
             self.dist = dist
-            self.pad_token = pad_token
+        
+        self.pad_token = pad_token
 
         self.Decoder = Encoder(
             num_layers=self.num_layer, d_model=self.embedding_dim,
