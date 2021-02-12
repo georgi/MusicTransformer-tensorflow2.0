@@ -42,7 +42,8 @@ class Data:
         return np.array(batch_data)  # batch_size, seq_len
 
     def slide_seq2seq_batch(self, batch_size, length, mode='train'):
-        data = self.batch(batch_size, length+1, mode)
+        data = self.batch(batch_size, length + 1, mode)
+        assert(data.shape == (batch_size, length + 1))
         x = data[:, :-1]
         y = data[:, 1:]
         return x, y
@@ -71,6 +72,10 @@ class Data:
             data = data[start:start + max_length]
         else:
             data = np.append(data, self.token_eos)
-            while len(data) < max_length:
-                data = np.append(data, self.pad_token)
+
+        while len(data) < max_length:
+            data = np.append(data, self.pad_token)
+
+        assert(len(data) == max_length)
+
         return data
