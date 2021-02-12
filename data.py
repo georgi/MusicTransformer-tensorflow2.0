@@ -1,10 +1,8 @@
-import utils
 import random
-import pickle
-from tensorflow.python import keras
 import numpy as np
-import params as par
 from random import randrange, gauss
+import note_seq
+from note_seq.sequences_lib import stretch_note_sequence, transpose_note_sequence
         
 def train_test_split(dataset, split=0.90):
     train = list()
@@ -27,10 +25,11 @@ def load_seq_files(files):
 
 
 class Data:
-    def __init__(self, sequences, token_eos, pad_token):
+    def __init__(self, sequences, midi_encoder, token_eos, pad_token):
         self.token_eos = token_eos
         self.pad_token = pad_token
         self.sequences = sequences
+        self.midi_encoder = midi_encoder
         
     def __len__(self):
         return sum(len(s) for s in self.sequences.values()) 
@@ -60,12 +59,12 @@ class Data:
     def _get_seq(self, ns, max_length, mode):
         if mode == 'train':
             try:
-                data = encode_note_sequence(midi_encoder, self.augment(ns))
+                data = self.midi_encoder.encode_note_sequence(self.augment(ns))
             except BaseException as e:
                 print(e)
-                data = encode_note_sequence(midi_encoder, ns)
+                data = self.midi_encoder.encode_note_sequence(ns)
         else:
-            data = encode_note_sequence(midi_encoder, ns)
+            data = self.midi_encoder.encode_note_sequence(ns)
             
         if max_length < len(data):
             start = random.randrange(0, len(data) - max_length)

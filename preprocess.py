@@ -22,13 +22,13 @@ MAX_PITCH = 108
 class MidiEncoder:
     
     def __init__(self):
-        self.vocab_size = midi_encoder.vocab_size
-        self.midi_encoder = (
+        self.midi_encoder = MidiPerformanceEncoder(
             steps_per_second=STEPS_PER_SECOND,
             num_velocity_bins=NUM_VELOCITY_BINS,
             min_pitch=MIN_PITCH,
             max_pitch=MAX_PITCH,
         )
+        self.vocab_size = self.midi_encoder.vocab_size
 
 
     def encode_note_sequence(self, ns):
@@ -85,7 +85,7 @@ class MidiEncoder:
         return performance.to_sequence()
 
 
-def convert_midi_to_proto(self, path):
+def convert_midi_to_proto(path, dest_dir):
     midi = pretty_midi.PrettyMIDI(path)
     for i, inst in enumerate(midi.instruments):
         num_distinct_pitches = sum([i > 5 for i in inst.get_pitch_class_histogram()])
@@ -94,6 +94,6 @@ def convert_midi_to_proto(self, path):
     ns = mm.midi_to_note_sequence(midi)
     ns = apply_sustain_control_changes(ns)
     del ns.control_changes[:]
-    out_file = os.path.join(data_dir, os.path.basename(path)) + '.pb'
+    out_file = os.path.join(dest_dir, os.path.basename(path)) + '.pb'
     with open(out_file, 'wb') as f:
         f.write(ns.SerializeToString())

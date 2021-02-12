@@ -1,9 +1,9 @@
 from tensorflow.python import keras
 import tensorflow as tf
-import params as par
 import sys
 from tensorflow.python.keras.optimizer_v2.learning_rate_schedule import LearningRateSchedule
 
+PAD_TOKEN = 0
 
 class MTFitCallback(keras.callbacks.Callback):
 
@@ -23,7 +23,7 @@ class TransformerLoss(keras.losses.SparseCategoricalCrossentropy):
 
     def call(self, y_true, y_pred):
         y_true = tf.cast(y_true, tf.int32)
-        mask = tf.math.logical_not(tf.math.equal(y_true, par.pad_token))
+        mask = tf.math.logical_not(tf.math.equal(y_true, PAD_TOKEN))
         mask = tf.cast(mask, tf.float32)
         _loss = super(TransformerLoss, self).call(y_true, y_pred)
         _loss *= mask
@@ -35,9 +35,9 @@ class TransformerLoss(keras.losses.SparseCategoricalCrossentropy):
         return _loss
 
 
-def transformer_dist_train_loss(y_true, y_pred, vocab_size=par.vocab_size):
+def transformer_dist_train_loss(y_true, y_pred, vocab_size):
     y_true = tf.cast(y_true, tf.int32)
-    mask = tf.math.logical_not(tf.math.equal(y_true, par.pad_token))
+    mask = tf.math.logical_not(tf.math.equal(y_true, PAD_TOKEN))
     mask = tf.cast(mask, tf.float32)
 
     y_true_vector = tf.one_hot(y_true, vocab_size)

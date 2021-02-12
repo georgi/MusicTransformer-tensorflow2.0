@@ -1,19 +1,11 @@
 from model import MusicTransformerDecoder
-from custom.layers import *
-from custom import callback
-import params as par
-from tensorflow.python.keras.optimizer_v2.adam import Adam
-from data import Data
-import utils
 import argparse
-import datetime
-import sys
-
-tf.executing_eagerly()
-
+import numpy as np
+import os
 from concurrent.futures import ThreadPoolExecutor
 
-def run_training(epochs, dataset, batch_size, max_seq):
+
+def run_training(model, epochs, dataset, batch_size, model_path, max_seq):
     batches_per_epoch = len(dataset) // batch_size
     num_eval_batches = 20
 
@@ -27,7 +19,7 @@ def run_training(epochs, dataset, batch_size, max_seq):
 
     with ThreadPoolExecutor(max_workers=1) as executor:
         for e in range(epochs):
-            mt.reset_metrics()
+            model.reset_metrics()
             train_acc = []
             train_loss = []      
             valid_acc = []
@@ -40,7 +32,7 @@ def run_training(epochs, dataset, batch_size, max_seq):
 
             for future in futures:
                 batch_x, batch_y = future.result()
-                result_metrics = mt.train_on_batch(batch_x, batch_y)
+                result_metrics = model.train_on_batch(batch_x, batch_y)
                 train_loss.append(result_metrics[0])
                 train_acc.append(result_metrics[1])
                 log_line = 'Train Loss: {:.3f}\tTrain Acc: {:.3f}'.format( 
@@ -56,11 +48,11 @@ def run_training(epochs, dataset, batch_size, max_seq):
 
             for future in futures:
                 eval_x, eval_y = future.result()
-                eval_result_metrics, weights = mt.evaluate(eval_x, eval_y)
+                eval_result_metrics, weights = model.evaluate(eval_x, eval_y)
                 valid_loss.append(eval_result_metrics[0])
                 valid_acc.append(eval_result_metrics[1])
 
-            mt.save(model_path)
+            model.save(model_path)
 
             log_line = 'Epoch {}\tTrain Loss: {:.3f}\tTrain Acc: {:.3f}\tValid Loss: {:.3f}\tValid Acc: {:.3f}'.format(
                 e,

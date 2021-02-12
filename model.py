@@ -1,6 +1,5 @@
 from custom.layers import *
 from custom.callback import *
-import params as par
 import sys
 from tensorflow.python import keras
 import json
@@ -13,7 +12,7 @@ tf.executing_eagerly()
 
 class MusicTransformerDecoder(keras.Model):
     def __init__(self, embedding_dim=256, vocab_size=388+2, num_layer=6,
-                 max_seq=2048, dropout=0.2, debug=False, loader_path=None, dist=False):
+                 max_seq=2048, dropout=0.2, debug=False, loader_path=None, dist=False, pad_token=0):
         super(MusicTransformerDecoder, self).__init__()
 
         if loader_path is not None:
@@ -25,6 +24,7 @@ class MusicTransformerDecoder(keras.Model):
             self.embedding_dim = embedding_dim
             self.vocab_size = vocab_size
             self.dist = dist
+            self.pad_token = pad_token
 
         self.Decoder = Encoder(
             num_layers=self.num_layer, d_model=self.embedding_dim,
@@ -52,7 +52,7 @@ class MusicTransformerDecoder(keras.Model):
 
         x, y = self.__prepare_train_data(x, y)
 
-        _, _, look_ahead_mask = utils.get_masked_with_pad_tensor(self.max_seq, x, x)
+        _, _, look_ahead_mask = utils.get_masked_with_pad_tensor(self.max_seq, x, x, self.pad_token)
 
         if self.dist:
             predictions = self.__dist_train_step(
@@ -96,7 +96,7 @@ class MusicTransformerDecoder(keras.Model):
                  max_queue_size=10, workers=1, use_multiprocessing=False):
 
         # x, inp_tar, out_tar = MusicTransformer.__prepare_train_data(x, y)
-        _, _, look_ahead_mask = utils.get_masked_with_pad_tensor(self.max_seq, x, x)
+        _, _, look_ahead_mask = utils.get_masked_with_pad_tensor(self.max_seq, x, x, self.pad_token)
         predictions, w = self.call(
                 x, lookup_mask=look_ahead_mask, training=False, eval=True)
         loss = tf.reduce_mean(self.loss(y, predictions))
@@ -131,7 +131,7 @@ class MusicTransformerDecoder(keras.Model):
         # mode: v -> vector, d -> dict
         # x, inp_tar, out_tar = self.__prepare_train_data(x, y)
 
-        _, tar_mask, look_ahead_mask = utils.get_masked_with_pad_tensor(self.max_seq, x, x)
+        _, tar_mask, look_ahead_mask = utils.get_masked_with_pad_tensor(self.max_seq, x, x, self.pad_token)
         predictions = self.call(
             x, lookup_mask=look_ahead_mask, training=False)
 
@@ -171,7 +171,7 @@ class MusicTransformerDecoder(keras.Model):
                 break
             print('generating... {:.1f}% completed'.format((i/min(self.max_seq, length))*100), end="\r")
             _, _, look_ahead_mask = \
-                utils.get_masked_with_pad_tensor(decode_array.shape[1], decode_array, decode_array)
+                utils.get_masked_with_pad_tensor(decode_array.shape[1], decode_array, decode_array, self.pad_token)
 
             result = self.call(decode_array, lookup_mask=look_ahead_mask, training=False, eval=False)
             result = result[:,-1,:]
